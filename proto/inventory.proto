@@ -1,0 +1,52 @@
+// inventory.proto
+syntax = "proto3";
+
+// กำหนด package name
+package inventory;
+
+// กำหนด path สำหรับ Go code ที่จะถูก generate ออกมา
+option go_package = "./pb";
+
+service InventoryService {
+
+  rpc CheckAvailability (CheckRequest) returns (CheckResponse);
+  
+  rpc ReserveRoom (ReserveRequest) returns (ReserveResponse);
+  
+  rpc ReleaseRoom (ReleaseRequest) returns (ReleaseResponse);
+}
+
+// --- Messages สำหรับ ReserveRoom ---
+message ReserveRequest {
+  string booking_id = 1;
+  string room_type_id = 2;
+  string check_in_date = 3;  // รูปแบบ YYYY-MM-DD
+  string check_out_date = 4;
+  int32 room_count = 5;
+}
+
+message ReserveResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// --- Messages สำหรับ CheckAvailability ---
+message CheckRequest {
+  string room_type_id = 1;
+  string date = 2;
+}
+
+message CheckResponse {
+  int32 available_rooms = 1;
+}
+
+// --- Messages สำหรับ ReleaseRoom ---
+message ReleaseRequest {
+  string booking_id = 1;
+  string room_type_id = 2;
+  int32 room_count = 3;
+}
+
+message ReleaseResponse {
+  bool success = 1;
+}
