@@ -2,7 +2,9 @@ package repository
 
 import (
 	"inventoryService/core/entity"
+	"strconv"
 	"time"
+
 	"gorm.io/gorm"
 )
 
@@ -22,15 +24,19 @@ type InventoryModel struct {
 	Total      int
 }
 
-func (r *InventoryRepository) GetInventoryByRoomTypeAndDate(roomTypeId string, date string) (*entity.RoomInventory, error) {
+func (r *InventoryRepository) GetAvailability(roomTypeId string, date time.Time) (int, error) {
 	var inventoryModel InventoryModel
-	result := r.db.Where("room_type_id = ? AND date = ?", roomTypeId, date).First(&inventoryModel)
+	roomid,err :=  strconv.Atoi(roomTypeId)
+	if err != nil {
+		return 0, err
+	}
+	result := r.db.Where("id = ? OR date = ?", roomid, date.Format("2006-01-02")).First(&inventoryModel)
 	if result.Error != nil {
-		return nil, result.Error
+		return 0, result.Error
 	}
 	parsedDate, err := time.Parse("2006-01-02", inventoryModel.Date)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	inventory := &entity.RoomInventory{
 		ID:         inventoryModel.ID,
@@ -39,7 +45,7 @@ func (r *InventoryRepository) GetInventoryByRoomTypeAndDate(roomTypeId string, d
 		Available:  inventoryModel.Available,
 		Total:      inventoryModel.Total,
 	}
-	return inventory, nil
+	return inventory.Available, nil
 }
 
 func (r *InventoryRepository) UpdateInventory(inventory *entity.RoomInventory) error {
@@ -51,5 +57,45 @@ func (r *InventoryRepository) UpdateInventory(inventory *entity.RoomInventory) e
 		Total:      inventory.Total,
 	}
 	result := r.db.Save(&inventoryModel)
+	return result.Error
+}
+
+func (r *InventoryRepository) CreateInventory(inventory entity.RoomInventory) error {
+	inventoryModel := InventoryModel{
+		RoomTypeId: inventory.RoomTypeId,
+		Date:       inventory.Date.Format("2006-01-02"),
+		Available:  inventory.Available,
+		Total:      inventory.Total,
+	}
+	result := r.db.Create(&inventoryModel)
+	return result.Error
+}
+
+func (r *InventoryRepository) ReserveRooms(roomTypeId string, date time.Time, count int) error {
+	var inventoryModel InventoryModel
+	result := r.db.Where("room_type_id = ? AND date = ?", roomTypeId, date.Format("2006-01-02")).First(&inventoryModel)
+	if result.Error != nil {
+		return result.Error
+	}
+	if inventoryModel.Available < count {
+		return nil // Not enough rooms available
+	}
+
+	inventoryModel.Available -= count
+	result = r.db.Save(&inventoryModel)
+	return result.Error
+}
+
+func (r *InventoryRepository) ReleaseRooms(roomTypeId string, date time.Time, count int) error {
+	var inventoryModel InventoryModel
+	result := r.db.Where("room_type_id = ? AND date = ?", roomTypeId, date.Format("2006-01-02")).First(&inventoryModel)
+	if result.Error != nil {
+		return result.Error
+	}
+	inventoryModel.Available += count
+	if inventoryModel.Available > inventoryModel.Total {
+		inventoryModel.Available = inventoryModel.Total // Ensure available does not exceed total
+	}
+	result = r.db.Save(&inventoryModel)
 	return result.Error
 }
